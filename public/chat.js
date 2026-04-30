@@ -5,7 +5,6 @@ let ws = null;
 let clientId = null;
 let currentUsername = null;
 let currentRoom = null;
-let typingTimeout = null;
 let isCurrentlyTyping = false;
 
 // DOM Elements
@@ -284,17 +283,6 @@ function handleTyping() {
         isCurrentlyTyping = true;
         send({ type: 'typing_start' });
     }
-
-    // Clear existing timeout
-    if (typingTimeout) {
-        clearTimeout(typingTimeout);
-    }
-
-    // Set new timeout to stop typing indicator
-    typingTimeout = setTimeout(() => {
-        isCurrentlyTyping = false;
-        send({ type: 'typing_stop' });
-    }, 1000);
 }
 
 // Event Listeners
@@ -337,9 +325,6 @@ clearChatBtn.addEventListener('click', () => {
 
 sendBtn.addEventListener('click', () => {
     const content = messageInput.value.trim();
-
-
-
     const userNum = parseInt(document.getElementById('user_count').textContent)
 
     if (userNum > cdthreshold){
@@ -351,7 +336,10 @@ sendBtn.addEventListener('click', () => {
     if (content) {
         send({ type: 'chat_message', content });
         messageInput.value = '';
-        isCurrentlyTyping = false;
+        if (isCurrentlyTyping) {
+            isCurrentlyTyping = false;
+            send({ type: 'typing_stop' });
+        }
 
         if (cdactive == true){
             sendBtn.disabled = true;
