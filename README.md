@@ -12,7 +12,7 @@ In another terminal, run `node server.js` for a server on port 3000.
 
 In another terminal, run `PORT=3001 node server.js` for another server on port 3001.
 
-In another terminal, run 'node simulate_concurrent.js' to simulate 50 concurrent users on port 3000.
+In another terminal, run `node simulate_concurrent.js` to simulate 50 concurrent users on port 3000.
 
 
 You can visit `localhost:8080` with multiple tabs to simulate multiple users.
