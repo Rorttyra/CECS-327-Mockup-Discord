@@ -250,8 +250,7 @@ button:disabled:hover {
     position: absolute;
     background: #0f3460;
     border-radius: 12px;
-    min-height: 1000px;
-    z-index: 5;
+    min-height: 825px;
 
 }
 #user-counter h1{
