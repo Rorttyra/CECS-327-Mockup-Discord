@@ -5,6 +5,7 @@ const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const { initRedisAdapter, publishMessage } = require('./redis-adapter');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,6 +19,7 @@ const rooms = new Map();
 const messageHistory = [];
 const ROOM_NAME = 'global';
 const ROOM_PASSWORD = '123'; // prob use a .env file instead
+const LOG_FILE = path.join(__dirname, 'chat_log.txt');
 rooms.set(ROOM_NAME, new Set());
 const SERVER_ID = uuidv4();
 
@@ -41,7 +43,9 @@ const MSG = {
     TYPING_INDICATOR: 'typing_indicator',
     ERROR: 'error',
     ROOM_USERS: 'room_users',
-    MESSAGE_HISTORY: 'message_history'
+    MESSAGE_HISTORY: 'message_history',
+    CLEAR_CHAT: 'clear_chat',
+    CHAT_CLEARED: 'chat_cleared'
 };
 
 // Connection handler
@@ -101,6 +105,9 @@ function handleMessage(ws, data) {
             break;
         case MSG.TYPING_STOP:
             setTyping(ws, client, false);
+            break;
+        case MSG.CLEAR_CHAT:
+            clearChat(ws, client);
             break;
     }
 }
@@ -182,6 +189,36 @@ function leaveRoom(ws, client, options = { notifyClient: true, publish: true }) 
     if (options.publish) {
         publishMessage(SERVER_ID, roomName, leaveEvent);
     }
+}
+
+function clearChat(ws, client) {
+    if (!client.username || !client.currentRoom) return;
+
+    const roomName = client.currentRoom;
+    const timestamp = new Date().toISOString();
+
+    const roomMessages = messageHistory.filter(m => m.room === roomName);
+    if (roomMessages.length > 0) {
+        const divider = '='.repeat(60);
+        const header = `\n${divider}\nChat cleared by ${client.username} in #${roomName} at ${timestamp}\n${divider}\n`;
+        const lines = roomMessages.map(m =>
+            `[${m.timestamp}] ${m.username}: ${m.content}`
+        ).join('\n');
+        const footer = `\n${divider}\nEnd of cleared messages (${roomMessages.length} total)\n${divider}\n`;
+
+        try {
+            fs.appendFileSync(LOG_FILE, header + lines + footer, 'utf8');
+            console.log(`Logged ${roomMessages.length} messages to ${LOG_FILE}`);
+        } catch (err) {
+            console.error('Failed to write log file:', err);
+        }
+    }
+
+    broadcastToRoom(roomName, {
+        type: MSG.CHAT_CLEARED,
+        clearedBy: client.username,
+        timestamp
+    });
 }
 
 function chatMessage(ws, client, content) {

@@ -21,6 +21,7 @@ const roomCode = document.getElementById('room-input-code');
 const joinRoomBtn = document.getElementById('join-room-btn');
 const roomNameDisplay = document.getElementById('room-name');
 const leaveRoomBtn = document.getElementById('leave-room-btn');
+const clearChatBtn = document.getElementById('clear-chat-btn');
 const usersList = document.getElementById('users-list');
 const messagesContainer = document.getElementById('messages-container');
 const typingIndicator = document.getElementById('typing-indicator');
@@ -29,6 +30,7 @@ const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 
 leaveRoomBtn.disabled = true;
+clearChatBtn.disabled = true;
 messageInputContainer.classList.add('hidden-input');
 
 // Initialize connection
@@ -83,6 +85,7 @@ function handleServerMessage(message) {
             currentRoom = message.room;
             roomNameDisplay.textContent = `#${message.room}`;
             leaveRoomBtn.disabled = false;
+            clearChatBtn.disabled = false;
             messageInputContainer.classList.remove('hidden-input'); 
             showPanel('chat');
             messageInput.focus();
@@ -91,6 +94,7 @@ function handleServerMessage(message) {
         case 'room_left':
             currentRoom = null;
             leaveRoomBtn.disabled = true;
+            clearChatBtn.disabled = true;
             messageInputContainer.classList.add('hidden-input');
             showPanel('room');
             messagesContainer.innerHTML = '';
@@ -127,6 +131,13 @@ function handleServerMessage(message) {
 
         case 'typing_indicator':
             updateTypingIndicator(message);
+            break;
+
+        case 'chat_cleared':
+            messagesContainer.innerHTML = '';
+            typingUsers.clear();
+            typingIndicator.classList.add('hidden');
+            addSystemMessage(`Chat was cleared by ${message.clearedBy}`);
             break;
 
         case 'private_message':
@@ -206,6 +217,7 @@ function updateUsersList(users) {
 
 // Update typing indicator
 const typingUsers = new Map();
+const TYPING_NAME_LIMIT = 50;
 
 function updateTypingIndicator(message) {
     if (message.isTyping) {
@@ -216,23 +228,30 @@ function updateTypingIndicator(message) {
 
     if (typingUsers.size === 0) {
         typingIndicator.classList.add('hidden');
-    } else {
-        const names = Array.from(typingUsers.values());
-        let text;
+        return;
+    }
 
-        if (names.length === 1) {
+    const names = Array.from(typingUsers.values());
+    const count = names.length;
+    const nameList = names.join(', ');
+    let text;
+
+    if (nameList.length <= TYPING_NAME_LIMIT) {
+        if (count === 1) {
             text = `${names[0]} is typing...`;
-        } else if (names.length === 2) {
+        } else if (count === 2) {
             text = `${names[0]} and ${names[1]} are typing...`;
         } else {
-            text = 'Several people are typing...';
+            const allButLast = names.slice(0, -1).join(', ');
+            text = `${allButLast}, and ${names[count - 1]} are typing...`;
         }
-
-        typingIndicator.textContent = text;
-        typingIndicator.classList.remove('hidden');
+    } else {
+        text = `Several users (${count}) are typing...`;
     }
-}
 
+    typingIndicator.textContent = text;
+    typingIndicator.classList.remove('hidden');
+}
 // Scroll messages to bottom
 function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -301,6 +320,12 @@ roomCode.addEventListener('keypress', (e) => {
 
 leaveRoomBtn.addEventListener('click', () => {
     send({ type: 'leave_room' });
+});
+
+clearChatBtn.addEventListener('click', () => {
+    if (confirm('Clear the chat for everyone? Messages will be saved to the server log.')) {
+        send({ type: 'clear_chat' });
+    }
 });
 
 sendBtn.addEventListener('click', () => {
