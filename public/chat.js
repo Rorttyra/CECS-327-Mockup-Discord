@@ -30,7 +30,7 @@ const sendBtn = document.getElementById('send-btn');
 
 const cdthreshold = 30;
 let cdactive = false;
-
+const ucount  =  document.getElementById('user-counter')
 leaveRoomBtn.disabled = true;
 clearChatBtn.disabled = true;
 messageInputContainer.classList.add('hidden-input');
@@ -164,7 +164,11 @@ function showPanel(panel) {
 
     if (panel === 'login') loginPanel.classList.remove('hidden');
     if (panel === 'room') roomPanel.classList.remove('hidden');
-    if (panel === 'chat') chatPanel.classList.remove('hidden');
+    if (panel === 'chat') {
+        chatPanel.classList.remove('hidden');
+        ucount.classList.remove('hidden');
+
+    } 
 }
 
 // Display a chat message
