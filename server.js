@@ -4,6 +4,8 @@ const http = require('http');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const { initRedisAdapter, publishMessage } = require('./redis-adapter');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,7 +19,9 @@ const rooms = new Map();
 const messageHistory = [];
 const ROOM_NAME = 'global';
 const ROOM_PASSWORD = '123'; // prob use a .env file instead
+const LOG_FILE = path.join(__dirname, 'chat_log.txt');
 rooms.set(ROOM_NAME, new Set());
+const SERVER_ID = uuidv4();
 
 
 // Message types
@@ -39,7 +43,9 @@ const MSG = {
     TYPING_INDICATOR: 'typing_indicator',
     ERROR: 'error',
     ROOM_USERS: 'room_users',
-    MESSAGE_HISTORY: 'message_history'
+    MESSAGE_HISTORY: 'message_history',
+    CLEAR_CHAT: 'clear_chat',
+    CHAT_CLEARED: 'chat_cleared'
 };
 
 // Connection handler
@@ -100,6 +106,9 @@ function handleMessage(ws, data) {
         case MSG.TYPING_STOP:
             setTyping(ws, client, false);
             break;
+        case MSG.CLEAR_CHAT:
+            clearChat(ws, client);
+            break;
     }
 }
 
@@ -134,8 +143,6 @@ function joinRoom(ws, client, roomName, password) {
     if (roomName !== ROOM_NAME) return sendError(ws, 'Room not found');
     if (password !== ROOM_PASSWORD) return sendError(ws, 'Password incorrect');
 
-    // if (!rooms.has(roomName)) rooms.set(roomName, new Set());
-    
     rooms.get(roomName).add(ws);
     client.currentRoom = roomName;
 
@@ -147,45 +154,85 @@ function joinRoom(ws, client, roomName, password) {
     const users = getUsersInRoom(roomName);
     ws.send(JSON.stringify({ type: MSG.ROOM_USERS, users }));
 
-    broadcastToRoom(roomName, {
+    const joinEvent = {
         type: MSG.USER_JOINED,
         username: client.username,
         userId: client.id
-    }, ws);
+    };
 
+    broadcastToRoom(roomName, joinEvent, ws);
+    publishMessage(SERVER_ID, roomName, joinEvent);
     broadcastToRoom(roomName, {
+
         type: MSG.ROOM_USERS,
         users: users
     }, ws);
-
-
-
 }
 
-function leaveRoom(ws, client) {
+function leaveRoom(ws, client, options = { notifyClient: true, publish: true }) {
     if (!client.currentRoom) return;
 
     const roomName = client.currentRoom;
     const room = rooms.get(roomName);
+    if (room) {
+        room.delete(ws);
+    }
 
+    if (options.notifyClient && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: MSG.ROOM_LEFT, room: roomName }));
+    }
 
-    ws.send(JSON.stringify({ type: MSG.ROOM_LEFT, room: roomName }));
     client.currentRoom = null;
-    room.delete(ws);
 
-    const users = getUsersInRoom(roomName);
-
-    broadcastToRoom(roomName, {
+    const leaveEvent = {
         type: MSG.USER_LEFT,
         username: client.username,
         userId: client.id
-    });
+    };
+
+    broadcastToRoom(roomName, leaveEvent, ws);
+    if (options.publish) {
+        publishMessage(SERVER_ID, roomName, leaveEvent);
+    }
+
+
+    const users = getUsersInRoom(roomName);
+
 
     broadcastToRoom(roomName, {
         type: MSG.ROOM_USERS,
         users: users
     });
+}
 
+function clearChat(ws, client) {
+    if (!client.username || !client.currentRoom) return;
+
+    const roomName = client.currentRoom;
+    const timestamp = new Date().toISOString();
+
+    const roomMessages = messageHistory.filter(m => m.room === roomName);
+    if (roomMessages.length > 0) {
+        const divider = '='.repeat(60);
+        const header = `\n${divider}\nChat cleared by ${client.username} in #${roomName} at ${timestamp}\n${divider}\n`;
+        const lines = roomMessages.map(m =>
+            `[${m.timestamp}] ${m.username}: ${m.content}`
+        ).join('\n');
+        const footer = `\n${divider}\nEnd of cleared messages (${roomMessages.length} total)\n${divider}\n`;
+
+        try {
+            fs.appendFileSync(LOG_FILE, header + lines + footer, 'utf8');
+            console.log(`Logged ${roomMessages.length} messages to ${LOG_FILE}`);
+        } catch (err) {
+            console.error('Failed to write log file:', err);
+        }
+    }
+
+    broadcastToRoom(roomName, {
+        type: MSG.CHAT_CLEARED,
+        clearedBy: client.username,
+        timestamp
+    });
 }
 
 function chatMessage(ws, client, content) {
@@ -208,6 +255,7 @@ function chatMessage(ws, client, content) {
     if (messageHistory.length > 1000) messageHistory.shift();
 
     broadcastToRoom(client.currentRoom, message);
+    publishMessage(SERVER_ID, client.currentRoom, message);
 }
 
 function privateMessage(ws, client, targetId, content) {
@@ -246,18 +294,22 @@ function setTyping(ws, client, isTyping) {
     if (!client.username || !client.currentRoom) return;
 
     client.isTyping = isTyping;
-    broadcastToRoom(client.currentRoom, {
+
+    const payload = {
         type: MSG.TYPING_INDICATOR,
         userId: client.id,
         username: client.username,
         isTyping
-    }, ws);
+    };
+
+    broadcastToRoom(client.currentRoom, payload, ws);
+    publishMessage(SERVER_ID, client.currentRoom, payload);
 }
 
 function handleDisconnect(ws) {
     const client = clients.get(ws);
     if (client && client.currentRoom) {
-        leaveRoom(ws, client);
+        leaveRoom(ws, client, { notifyClient: false, publish: true });
     }
     clients.delete(ws);
 }
@@ -283,6 +335,8 @@ function broadcastToRoom(roomName, message, excludeWs = null) {
         }
     }
 }
+
+initRedisAdapter(SERVER_ID, broadcastToRoom);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

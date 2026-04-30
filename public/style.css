@@ -15,6 +15,10 @@ body {
     align-items: center;
 }
 
+.hidden {
+    display: none;
+}
+
 .chat-container {
     width: 100%;
     max-width: 600px;
@@ -102,10 +106,30 @@ button:disabled:hover {
     font-size: 18px;
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 #leave-room-btn {
     padding: 8px 16px;
     font-size: 14px;
     background: #533483;
+}
+
+#leave-room-btn:hover:not(:disabled) {
+    background: #6a45a0;
+}
+
+#clear-chat-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    background: #7b2d26;
+}
+
+#clear-chat-btn:hover:not(:disabled) {
+    background: #a33d35;
 }
 
 #users-list {
