@@ -1,4 +1,4 @@
-// simulate.js - 50 concurrent users simulation
+// simulate_concurrent.js - 50 concurrent users simulation
 
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
@@ -8,9 +8,9 @@ const SERVER_URL   = 'ws://localhost:3000';
 const ROOM_NAME    = 'global';
 const ROOM_CODE    = '123';
 const NUM_USERS    = 50;
-const DURATION_MS  = 30_000;          // 30 sec
-const MIN_DELAY_MS = 300;             // min ms between messages per user
-const MAX_DELAY_MS = 2_500;           // max ms between messages per user
+const DURATION_MS  = 30_000;    // 30 sec
+const MIN_DELAY_MS = 6_000;       // min ms between messages per user
+const MAX_DELAY_MS = 7_500;     // max ms between messages per user
 
 const MESSAGES = [
     'Hi everyone!',
@@ -73,15 +73,15 @@ function runUser(index) {
                 const content = MESSAGES[rand(0, MESSAGES.length - 1)];
                 ws.send(JSON.stringify({ type: 'chat_message', content }));
                 totalSent++;
-                process.stdout.write(`\rTotal Sent: ${totalSent}`);
+                process.stdout.write(`\rTotal Messages Sent: ${totalSent}`);
             }
             sendNextMessage(); 
         }, rand(MIN_DELAY_MS, MAX_DELAY_MS));
     }
 
-    // 30秒後にこのユーザーを終了させる関数を返す
+    // Function will be called after 30 sec passed
     return function shutdown() {
-        if (timer) clearTimeout(timer); // Cancel if timer is not null
+        if (timer) clearTimeout(timer); // Cancel setTimeout() if timer is not null
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'leave_room' }));
             ws.close();
@@ -90,8 +90,8 @@ function runUser(index) {
 }
 
 
-
-console.log(`\n Simulation start with ${NUM_USERS} users（${DURATION_MS / 1000} seconds）\n`);
+// Simulation starts here
+console.log(`\nSimulation start with ${NUM_USERS} users（${DURATION_MS / 1000} seconds）\n`);
 
 // Launch 50 users concurrently and collect each shutdowns function
 const shutdowns = [];
