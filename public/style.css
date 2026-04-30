@@ -109,10 +109,9 @@ button:disabled:hover {
 }
 
 #users-list {
-    padding: 10px 20px;
-    background: #1a1a40;
-    font-size: 14px;
-    color: #888;
+    font-size: 25px;
+    padding-left: 20px;
+
 }
 
 #messages-container {
@@ -210,4 +209,18 @@ button:disabled:hover {
 
 .hidden-input {
     display: none;
+}
+
+#user-counter {
+    top: 50px;
+    right: 80px;
+    width: 300px;
+    position: absolute;
+    background: #16213e;
+    border-radius: 12px
+
+}
+
+#user_count{
+    font-size:20px;
 }

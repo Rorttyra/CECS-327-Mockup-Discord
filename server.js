@@ -153,6 +153,13 @@ function joinRoom(ws, client, roomName, password) {
         userId: client.id
     }, ws);
 
+    broadcastToRoom(roomName, {
+        type: MSG.ROOM_USERS,
+        users: users
+    }, ws);
+
+
+
 }
 
 function leaveRoom(ws, client) {
@@ -164,6 +171,21 @@ function leaveRoom(ws, client) {
 
     ws.send(JSON.stringify({ type: MSG.ROOM_LEFT, room: roomName }));
     client.currentRoom = null;
+    room.delete(ws);
+
+    const users = getUsersInRoom(roomName);
+
+    broadcastToRoom(roomName, {
+        type: MSG.USER_LEFT,
+        username: client.username,
+        userId: client.id
+    });
+
+    broadcastToRoom(roomName, {
+        type: MSG.ROOM_USERS,
+        users: users
+    });
+
 }
 
 function chatMessage(ws, client, content) {

@@ -28,6 +28,9 @@ const messageInputContainer = document.querySelector('.message-input-container')
 const messageInput = document.getElementById('message-input');
 const sendBtn = document.getElementById('send-btn');
 
+const cdthreshold = 30;
+let cdactive = false;
+
 leaveRoomBtn.disabled = true;
 messageInputContainer.classList.add('hidden-input');
 
@@ -202,6 +205,11 @@ function addSystemMessage(text) {
 function updateUsersList(users) {
     const names = users.map(u => u.username).join(', ');
     usersList.textContent = `Online: ${names}`;
+    document.getElementById('user_count').textContent = users.length;
+
+    usersList.innerHTML = users.map(user =>
+        `<li>${user.username}</li>`
+    ).join('');
 }
 
 // Update typing indicator
@@ -305,10 +313,32 @@ leaveRoomBtn.addEventListener('click', () => {
 
 sendBtn.addEventListener('click', () => {
     const content = messageInput.value.trim();
+
+
+
+    const userNum = parseInt(document.getElementById('user_count').textContent)
+
+    if (userNum > cdthreshold){
+        cdactive = true;
+    }
+
+
+
     if (content) {
         send({ type: 'chat_message', content });
         messageInput.value = '';
         isCurrentlyTyping = false;
+
+        if (cdactive == true){
+            sendBtn.disabled = true;
+            setTimeout(()=>{
+                sendBtn.disabled = false;
+                cdactive = false;
+
+            }, 12000)
+        }
+            
+
     }
 });
 
